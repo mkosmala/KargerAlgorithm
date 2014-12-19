@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import csv
+import random
 from array import array
 
 # I think I will do this for Season 4, which we have gold standard data for.
@@ -16,9 +17,12 @@ from array import array
 # line for each Capture-User and the Answer is 1 if they said that species
 # is there and -1 if not.
 
-filename = "season4.csv"
+#filename = "season4.csv"
+filename = "fakedata.csv"
 
 species = 47 # wildebeest
+
+k = 30 # iterations
 
 xij = dict()
 yji = dict()
@@ -45,7 +49,8 @@ with open(filename,'rb') as fh:
 
         # create an array for each capture-user
         if not xij[subj].has_key(user):
-            xij[subj][user] = array('i',[-1,0,0,0,0,0,0,0])
+            arrlist = [-1,0] + [0]*k
+            xij[subj][user] = array('f',arrlist)
         
         # create a dictionary for each user in yji
         if not yji.has_key(user):
@@ -53,7 +58,9 @@ with open(filename,'rb') as fh:
 
         # create and array for each user-capture
         if not yji[user].has_key(subj):
-            yji[user][subj] = array('i',[-1,1,0,0,0,0,0,0])
+            startnum = random.gauss(1,1)
+            arrlist = [-1] + [startnum] + [0]*k
+            yji[user][subj] = array('f',arrlist)
 
         # and note that it's 1 if that animal was seen
         if spp==species:
@@ -68,64 +75,111 @@ print "total of " + str(total) + " lines read\n"
 # now we do the algorithm.
 # 1. we already initialized all users to have reliability 1
 
-counter = 0
-thous = 0
-
-# 2A. update each xij
-for subj in xij:
+# iterate
+for m in range(1,k+1):
+    print "iteration " + str(m)
     
-    for user in xij[subj]:
+    counter = 0
+    thous = 0
 
-        counter = counter + 1
-        if counter == 100000:
-            thous = thous + 1
-            counter = 0
-            print str(thous) + "00,000 xij edges processed"
+    # 2A. update each xij
+    for subj in xij:
 
-        # get all users other than the target user
-        allbutme = xij[subj].keys()
-        allbutme.remove(user)
-        
-        # for each, look up their yji values, multiply it by their answer
-        # and tally them all up
+        # for efficiency, calculate the sum of answer * yji for all users
+        # O(N) instead of O(N^2)
         tally = 0
-        for otherguy in allbutme:
-            tally = (tally +
-                     yji[otherguy][subj][0] * yji[otherguy][subj][1])
+        for eachuser in xij[subj].keys():
+           tally = (tally +
+                    yji[eachuser][subj][0] * yji[eachuser][subj][m])
+
+        numusers = len(xij[subj].keys())    
+
+        # and then do each user's score
+        for user in xij[subj]:
+
+            counter = counter + 1
+            if counter == 100000:
+                thous = thous + 1
+                counter = 0
+                print str(thous) + "00,000 xij edges processed"
+
+            # case where subject has been done just one user? this shouldn't happen
+            if numusers == 1:
+                xij[subj][user][m+1] = 0
+                print xij[subj]
+            else:
+                # subtract out the current user and divide
+                xij[subj][user][m+1] = ((tally -
+                                      (yji[user][subj][0] * yji[user][subj][m]))/
+                                      (numusers-1))
+
+
+    counter = 0
+    thous = 0
+
+    print "2A complete"
     
-        xij[subj][user][2] = tally
+    # 2B. update each yji
+    for user in yji:
 
-counter = 0
-thous = 0
-
-print "2A complete"
-
-# 2B. update each yji
-for user in yji:
-
-    for subj in yji[user]:
-        
-        counter = counter + 1
-        if counter == 1000:
-            thous = thous + 1
-            counter = 0
-            print str(thous) + ",000 yji edges processed"
-
-        # get all subjects other than the target subject
-        allbutthis = yji[user].keys()
-        allbutthis.remove(subj)
-
-        # for each, look up its xij values, multiply it by its answer
-        # and tally them all up
+        # for efficiency, calculate the sum of answer * xij for all subjects
+        # O(N) instead of O(N^2)
         tally = 0
-        for othersubj in allbutthis:
-            tally = (tally +
-                     xij[othersubj][user][0] * xij[othersubj][user][2])
+        for eachsubj in yji[user].keys():
+           tally = (tally +
+                    xij[eachsubj][user][0] * xij[eachsubj][user][m+1])
 
-        yji[user][subj][2] = tally
+        numsubjs = len(yji[user].keys())
 
-print "2B complete"
+        # and then do each subject's score
+        for subj in yji[user]:
+        
+            counter = counter + 1
+            if counter == 100000:
+                thous = thous + 1
+                counter = 0
+                print str(thous) + "00,000 yji edges processed"
 
-#print xij["ASG000e402"]
-#print
-print yji[33856]
+            # case where user has done just one subject
+            if numsubjs == 1:
+                yji[user][subj][m+1] = 0
+            else:
+                # subtract out the current subject
+                yji[user][subj][m+1] = ((tally -
+                                      (xij[subj][user][0] * xij[subj][user][m+1]))/
+                                      (numsubjs-1))
+
+    print "2B complete"
+
+
+# 3. and calculate answers
+with open("output.csv",'w') as fh:
+
+    fwriter = csv.writer(fh, delimiter=',')
+    fwriter.writerow(["zoonID"])
+        
+    # for each subject
+    for subj in xij:
+
+        outarr = array('f',[0]*k)        
+
+        # for each iteration
+        for m in range(1,k+1):
+
+            # tally the sum of each user's answer multiplied by their score
+            tally = 0
+            for eachuser in xij[subj].keys():
+               tally = (tally +
+                        yji[eachuser][subj][0] * yji[eachuser][subj][m+1])
+
+            outarr[m-1] = tally
+
+        # wildebeest
+        wildebeest = False
+        if outarr[k-1]>0:
+            wildebeest = True
+
+        fwriter.writerow([subj]+list(outarr)+[wildebeest])
+
+
+

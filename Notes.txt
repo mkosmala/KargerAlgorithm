@@ -1,0 +1,30 @@
+12/18/2014
+
+Got the basic algorithm up and running. But boy is it slow.
+
+12/19/2014
+
+Made it much more efficient by calcuating the next xij or yji by summing
+over ALL yji or xij, respectively, including the focal xij or yji. Then
+for each xij or yji, I subtract out their contribution. This means these
+steps run in O(N) time rather than O(N^2) time.
+
+But we see that users especially (and subjects to some extent) are unbalanced. In other words, some users have done hundreds of classifications and so their scores are going to be a lot higher than someone who's done just tens. Even if they are equal ability. To deal with this, I'm going to normalize all scores to between -1 and 1 by dividing by the total number of subjects. So if someone agrees with others 9/10 times, it will be the same as if she agrees with others 90/100 times. I'll do the subjects, too, since they vary from 10 to 25 usually.
+
+I just realized that there are blank consensuses in the season 4 dataset I created. In other words, if one person said "porcupine" but everyone else said blank, then there's a lone porcupine classification in the dataset. That will mess things up for sure... Time to redo the dataset.
+
+Okay, I've got it working now. Whee. Looks pretty good. But each iteration does change the number. I'm not sure if/when it stabilizes. Time to check that out.
+
+I've also noticed that not all subjects are in this dataset for some reason. I'm missing some that are in the expert data set. Hmm...
+
+So... seems like we don't need to run very many iterations. since the subjects never cross the zero line. Hmm. Maybe I need to try this out with simulated data. And/or try giving different initial weights to people. 
+
+Initial weights doesn't seem to matter. And weird. I ran it for 30 iterations. Everything asymptotes above or below zero. There's no crossing. So why the iterations? 
+
+Let's try some fake data.
+
+Even with fake data, it seems that one iteration is sufficient. I'd like to talk to Shah again and figure out why we want to iterate. For the record, I can create situations where the majority algorithm disagrees with Karger's. So it's possible to do better. But maybe I don't need to iterate 30 times...
+
+ 
+
+
